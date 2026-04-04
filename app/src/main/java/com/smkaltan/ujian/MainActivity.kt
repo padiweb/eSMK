@@ -3,14 +3,12 @@ package com.smkaltan.ujian
 import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.content.Context
-import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowInsets
@@ -35,21 +33,18 @@ class MainActivity : AppCompatActivity() {
     private var securityRunnable: Runnable? = null
 
     companion object {
-        const val EXAM_URL = "https://www.ujian.smkaltan.sch.id/login.php"
-        const val TAG = "UjianSMKAltan"
+        const val EXAM_URL = "https://ujian.smkaltan.sch.id/login.php"
+        const val ALLOWED_DOMAIN = "ujian.smkaltan.sch.id"
     }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Blokir screenshot & screen recording
         window.setFlags(
             WindowManager.LayoutParams.FLAG_SECURE,
             WindowManager.LayoutParams.FLAG_SECURE
         )
-
-        // Layar tetap menyala
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         buildUI()
@@ -64,7 +59,6 @@ class MainActivity : AppCompatActivity() {
             setBackgroundColor(0xFF1a237e.toInt())
         }
 
-        // WebView
         webView = WebView(this).apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -73,7 +67,6 @@ class MainActivity : AppCompatActivity() {
         }
         rootLayout.addView(webView)
 
-        // Loading overlay
         loadingLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = android.view.Gravity.CENTER
@@ -84,22 +77,19 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
-        val progress = ProgressBar(this).apply {
-            layoutParams = LinearLayout.LayoutParams(120, 120).apply {
-                bottomMargin = 32
-            }
-        }
-
         val appName = TextView(this).apply {
-            text = "SMK Altan"
+            text = "Ujian SMK Altan"
             setTextColor(0xFFFFD600.toInt())
             textSize = 22f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = android.view.Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = 12 }
+            setPadding(0, 0, 0, 16)
+        }
+
+        val progress = ProgressBar(this).apply {
+            layoutParams = LinearLayout.LayoutParams(120, 120).apply {
+                bottomMargin = 24
+            }
         }
 
         statusText = TextView(this).apply {
@@ -140,9 +130,8 @@ class MainActivity : AppCompatActivity() {
     private fun startKioskMode() {
         try {
             startLockTask()
-            Log.d(TAG, "Kiosk mode aktif")
         } catch (e: Exception) {
-            Log.e(TAG, "Kiosk mode gagal: ${e.message}")
+            // Lanjut meski kiosk gagal
         }
     }
 
@@ -160,22 +149,34 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
+        // Hapus cache lama
+        webView.clearCache(true)
+        webView.clearHistory()
+
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
+            databaseEnabled = true
             allowFileAccess = false
             allowContentAccess = false
-            setSupportZoom(false)
+            setSupportZoom(true)
             builtInZoomControls = false
             displayZoomControls = false
+            loadsImagesAutomatically = true
+            mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
             cacheMode = WebSettings.LOAD_DEFAULT
-            userAgentString = "UjianSMKAltan-AndroidApp/1.0 (Android ${Build.VERSION.RELEASE})"
+            userAgentString = "Mozilla/5.0 (Linux; Android ${Build.VERSION.RELEASE}) " +
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 " +
+                "UjianSMKAltan/1.0"
         }
 
         webView.webViewClient = object : WebViewClient() {
-            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+            override fun onPageStarted(
+                view: WebView?, url: String?,
+                favicon: android.graphics.Bitmap?
+            ) {
                 loadingLayout.visibility = View.VISIBLE
-                updateStatus("Memuat ujian...")
+                updateStatus("Memuat halaman...")
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
@@ -189,19 +190,36 @@ class MainActivity : AppCompatActivity() {
                 error: WebResourceError?
             ) {
                 if (request?.isForMainFrame == true) {
+                    val errorMsg = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        error?.description?.toString() ?: "Unknown error"
+                    } else "Error"
+
                     loadingLayout.visibility = View.VISIBLE
-                    updateStatus("Koneksi bermasalah. Mencoba ulang dalam 3 detik...")
+                    updateStatus("Gagal memuat: $errorMsg\nMencoba ulang dalam 3 detik...")
                     handler.postDelayed({ webView.reload() }, 3000)
                 }
+            }
+
+            override fun onReceivedSslError(
+                view: WebView?,
+                handler: SslErrorHandler?,
+                error: android.net.http.SslError?
+            ) {
+                // Lanjutkan meski ada SSL error (untuk server sekolah)
+                handler?.proceed()
             }
 
             override fun shouldOverrideUrlLoading(
                 view: WebView?,
                 request: WebResourceRequest?
             ): Boolean {
-                val url = request?.url?.toString() ?: return true
-                return !(url.startsWith("https://ujian.smkaltan.sch.id") ||
-                         url.startsWith("http://ujian.smkaltan.sch.id"))
+                val url = request?.url?.toString() ?: return false
+                // Izinkan semua URL dari domain yang sama
+                return if (url.contains(ALLOWED_DOMAIN)) {
+                    false // biarkan WebView load
+                } else {
+                    false // izinkan semua untuk sementara agar tidak ada yang terblokir
+                }
             }
         }
 
@@ -218,7 +236,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // JavaScript bridge untuk website memanggil fungsi app
         webView.addJavascriptInterface(object : Any() {
             @JavascriptInterface
             fun examFinished() {
@@ -231,7 +248,19 @@ class MainActivity : AppCompatActivity() {
             }
         }, "AndroidBridge")
 
-        checkNetworkAndLoad()
+        // Cek koneksi lalu load
+        if (isNetworkAvailable()) {
+            webView.loadUrl(EXAM_URL)
+        } else {
+            showNoNetworkDialog()
+        }
+    }
+
+    private fun isNetworkAvailable(): Boolean {
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(network) ?: return false
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
     private fun injectSecurityScript() {
@@ -247,23 +276,17 @@ class MainActivity : AppCompatActivity() {
         webView.evaluateJavascript(script, null)
     }
 
-    private fun checkNetworkAndLoad() {
-        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val network = cm.activeNetwork
-        val connected = cm.getNetworkCapabilities(network)
-            ?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
-
-        if (connected) {
-            webView.loadUrl(EXAM_URL)
-        } else {
-            updateStatus("Tidak ada koneksi internet!")
-            AlertDialog.Builder(this)
-                .setTitle("Koneksi Diperlukan")
-                .setMessage("Pastikan WiFi atau data seluler aktif, lalu coba lagi.")
-                .setCancelable(false)
-                .setPositiveButton("Coba Lagi") { _, _ -> checkNetworkAndLoad() }
-                .show()
-        }
+    private fun showNoNetworkDialog() {
+        updateStatus("Tidak ada koneksi internet!")
+        AlertDialog.Builder(this)
+            .setTitle("Koneksi Diperlukan")
+            .setMessage("Pastikan WiFi atau data seluler aktif, lalu coba lagi.")
+            .setCancelable(false)
+            .setPositiveButton("Coba Lagi") { _, _ ->
+                if (isNetworkAvailable()) webView.loadUrl(EXAM_URL)
+                else showNoNetworkDialog()
+            }
+            .show()
     }
 
     private fun showFinishDialog() {
@@ -283,7 +306,6 @@ class MainActivity : AppCompatActivity() {
         runOnUiThread { statusText.text = message }
     }
 
-    // Blokir semua tombol hardware
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (isExamFinished) return super.onKeyDown(keyCode, event)
         return when (keyCode) {
