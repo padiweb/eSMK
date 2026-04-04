@@ -1,9 +1,6 @@
 package com.smkaltan.ujian
 
 import android.annotation.SuppressLint
-import android.app.ActivityManager
-import android.app.admin.DevicePolicyManager
-import android.content.ComponentName
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -36,7 +33,6 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         const val EXAM_URL = "https://ujian.smkaltan.sch.id/login.php"
-        const val ALLOWED_DOMAIN = "ujian.smkaltan.sch.id"
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -79,7 +75,6 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
-        // Icon buku sederhana via TextView (unicode)
         val bookIcon = TextView(this).apply {
             text = "📖"
             textSize = 56f
@@ -89,7 +84,6 @@ class MainActivity : AppCompatActivity() {
 
         val appName = TextView(this).apply {
             text = "Ujian SMK Altan"
-            // PUTIH (bukan kuning)
             setTextColor(0xFFFFFFFF.toInt())
             textSize = 22f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
@@ -99,7 +93,6 @@ class MainActivity : AppCompatActivity() {
 
         val appSubtitle = TextView(this).apply {
             text = "Sistem Ujian Online"
-            // Putih transparan untuk subtitle
             setTextColor(0xAAFFFFFF.toInt())
             textSize = 13f
             gravity = android.view.Gravity.CENTER
@@ -114,7 +107,6 @@ class MainActivity : AppCompatActivity() {
 
         statusText = TextView(this).apply {
             text = "Memuat sistem ujian..."
-            // PUTIH (bukan kuning)
             setTextColor(0xAAFFFFFF.toInt())
             textSize = 13f
             gravity = android.view.Gravity.CENTER
@@ -152,17 +144,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun startKioskMode() {
         try {
-            val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-            val adminComponent = ComponentName(this, ExamDeviceAdminReceiver::class.java)
-
-            if (dpm.isDeviceOwnerApp(packageName)) {
-                // Device Owner: kiosk tanpa dialog sama sekali
-                dpm.setLockTaskPackages(adminComponent, arrayOf(packageName))
-                startLockTask()
-            } else {
-                // Tanpa Device Owner: screen pinning biasa (ada dialog sekali)
-                startLockTask()
-            }
+            startLockTask()
         } catch (e: Exception) {
             // Lanjut meski gagal
         }
@@ -203,7 +185,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         webView.webViewClient = object : WebViewClient() {
-            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+            override fun onPageStarted(
+                view: WebView?, url: String?,
+                favicon: android.graphics.Bitmap?
+            ) {
                 loadingLayout.visibility = View.VISIBLE
                 updateStatus("Memuat halaman...")
             }
@@ -213,7 +198,11 @@ class MainActivity : AppCompatActivity() {
                 injectSecurityScript()
             }
 
-            override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
+            override fun onReceivedError(
+                view: WebView?,
+                request: WebResourceRequest?,
+                error: WebResourceError?
+            ) {
                 if (request?.isForMainFrame == true) {
                     val msg = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                         error?.description?.toString() ?: "Error"
@@ -224,11 +213,18 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: android.net.http.SslError?) {
+            override fun onReceivedSslError(
+                view: WebView?,
+                handler: SslErrorHandler?,
+                error: android.net.http.SslError?
+            ) {
                 handler?.proceed()
             }
 
-            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+            override fun shouldOverrideUrlLoading(
+                view: WebView?,
+                request: WebResourceRequest?
+            ): Boolean {
                 return false
             }
         }
