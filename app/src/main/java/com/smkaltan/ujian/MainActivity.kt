@@ -200,8 +200,8 @@ class MainActivity : AppCompatActivity() {
                 request: WebResourceRequest?
             ): Boolean {
                 val url = request?.url?.toString() ?: return true
-                return !(url.startsWith("https://www.ujiansmkaltan.sch.id") ||
-                         url.startsWith("https://ujiansmkaltan.sch.id"))
+                return !(url.startsWith("https://ujian.smkaltan.sch.id") ||
+                         url.startsWith("http://ujian.smkaltan.sch.id"))
             }
         }
 
