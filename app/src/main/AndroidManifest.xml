@@ -66,14 +66,7 @@
         </receiver>
 
         <!-- Foreground Service untuk monitoring keamanan -->
-        <service
-            android:name=".SecurityService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="exam_security_monitor"/>
-        </service>
+        
 
     </application>
 
