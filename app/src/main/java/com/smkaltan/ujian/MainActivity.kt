@@ -2,6 +2,8 @@ package com.smkaltan.ujian
 
 import android.annotation.SuppressLint
 import android.app.ActivityManager
+import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -77,29 +79,50 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
-        val appName = TextView(this).apply {
-            text = "Ujian SMK Altan"
-            setTextColor(0xFFFFD600.toInt())
-            textSize = 22f
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        // Icon buku sederhana via TextView (unicode)
+        val bookIcon = TextView(this).apply {
+            text = "📖"
+            textSize = 56f
             gravity = android.view.Gravity.CENTER
             setPadding(0, 0, 0, 16)
         }
 
+        val appName = TextView(this).apply {
+            text = "Ujian SMK Altan"
+            // PUTIH (bukan kuning)
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 22f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 0, 0, 8)
+        }
+
+        val appSubtitle = TextView(this).apply {
+            text = "Sistem Ujian Online"
+            // Putih transparan untuk subtitle
+            setTextColor(0xAAFFFFFF.toInt())
+            textSize = 13f
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 0, 0, 32)
+        }
+
         val progress = ProgressBar(this).apply {
-            layoutParams = LinearLayout.LayoutParams(120, 120).apply {
-                bottomMargin = 24
+            layoutParams = LinearLayout.LayoutParams(80, 80).apply {
+                bottomMargin = 20
             }
         }
 
         statusText = TextView(this).apply {
             text = "Memuat sistem ujian..."
-            setTextColor(0xFFFFFFFF.toInt())
-            textSize = 15f
+            // PUTIH (bukan kuning)
+            setTextColor(0xAAFFFFFF.toInt())
+            textSize = 13f
             gravity = android.view.Gravity.CENTER
         }
 
+        loadingLayout.addView(bookIcon)
         loadingLayout.addView(appName)
+        loadingLayout.addView(appSubtitle)
         loadingLayout.addView(progress)
         loadingLayout.addView(statusText)
         rootLayout.addView(loadingLayout)
@@ -129,9 +152,19 @@ class MainActivity : AppCompatActivity() {
 
     private fun startKioskMode() {
         try {
-            startLockTask()
+            val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+            val adminComponent = ComponentName(this, ExamDeviceAdminReceiver::class.java)
+
+            if (dpm.isDeviceOwnerApp(packageName)) {
+                // Device Owner: kiosk tanpa dialog sama sekali
+                dpm.setLockTaskPackages(adminComponent, arrayOf(packageName))
+                startLockTask()
+            } else {
+                // Tanpa Device Owner: screen pinning biasa (ada dialog sekali)
+                startLockTask()
+            }
         } catch (e: Exception) {
-            // Lanjut meski kiosk gagal
+            // Lanjut meski gagal
         }
     }
 
@@ -149,7 +182,6 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
-        // Hapus cache lama
         webView.clearCache(true)
         webView.clearHistory()
 
@@ -171,10 +203,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         webView.webViewClient = object : WebViewClient() {
-            override fun onPageStarted(
-                view: WebView?, url: String?,
-                favicon: android.graphics.Bitmap?
-            ) {
+            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                 loadingLayout.visibility = View.VISIBLE
                 updateStatus("Memuat halaman...")
             }
@@ -184,42 +213,23 @@ class MainActivity : AppCompatActivity() {
                 injectSecurityScript()
             }
 
-            override fun onReceivedError(
-                view: WebView?,
-                request: WebResourceRequest?,
-                error: WebResourceError?
-            ) {
+            override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
                 if (request?.isForMainFrame == true) {
-                    val errorMsg = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        error?.description?.toString() ?: "Unknown error"
+                    val msg = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        error?.description?.toString() ?: "Error"
                     } else "Error"
-
                     loadingLayout.visibility = View.VISIBLE
-                    updateStatus("Gagal memuat: $errorMsg\nMencoba ulang dalam 3 detik...")
+                    updateStatus("Gagal: $msg\nMencoba ulang...")
                     handler.postDelayed({ webView.reload() }, 3000)
                 }
             }
 
-            override fun onReceivedSslError(
-                view: WebView?,
-                handler: SslErrorHandler?,
-                error: android.net.http.SslError?
-            ) {
-                // Lanjutkan meski ada SSL error (untuk server sekolah)
+            override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: android.net.http.SslError?) {
                 handler?.proceed()
             }
 
-            override fun shouldOverrideUrlLoading(
-                view: WebView?,
-                request: WebResourceRequest?
-            ): Boolean {
-                val url = request?.url?.toString() ?: return false
-                // Izinkan semua URL dari domain yang sama
-                return if (url.contains(ALLOWED_DOMAIN)) {
-                    false // biarkan WebView load
-                } else {
-                    false // izinkan semua untuk sementara agar tidak ada yang terblokir
-                }
+            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                return false
             }
         }
 
@@ -248,7 +258,6 @@ class MainActivity : AppCompatActivity() {
             }
         }, "AndroidBridge")
 
-        // Cek koneksi lalu load
         if (isNetworkAvailable()) {
             webView.loadUrl(EXAM_URL)
         } else {
@@ -323,9 +332,7 @@ class MainActivity : AppCompatActivity() {
 
     @Deprecated("Deprecated")
     override fun onBackPressed() {
-        if (!isExamFinished && webView.canGoBack()) {
-            webView.goBack()
-        }
+        if (!isExamFinished && webView.canGoBack()) webView.goBack()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
