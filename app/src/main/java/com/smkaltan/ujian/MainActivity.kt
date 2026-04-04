@@ -35,7 +35,7 @@ class MainActivity : AppCompatActivity() {
     private var securityRunnable: Runnable? = null
 
     companion object {
-        const val EXAM_URL = "https://www.ujiansmkaltan.sch.id"
+        const val EXAM_URL = "https://www.ujian.smkaltan.sch.id"
         const val TAG = "UjianSMKAltan"
     }
 
