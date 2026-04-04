@@ -5,13 +5,12 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main ]
-  # Build manual via GitHub UI
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout kode
         uses: actions/checkout@v4
@@ -22,8 +21,24 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Accept Android SDK licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+      - name: Install Android SDK
+        run: |
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "platform-tools"
+
+      - name: Generate Gradle Wrapper
+        run: gradle wrapper --gradle-version=8.9 --distribution-type=bin
+
+      - name: Izinkan gradlew
+        run: chmod +x gradlew
 
       - name: Cache Gradle
         uses: actions/cache@v4
@@ -35,11 +50,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Izinkan gradlew
-        run: chmod +x gradlew
-
       - name: Build Debug APK
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
@@ -47,21 +59,3 @@ jobs:
           name: ujian-smkaltan-debug-${{ github.run_number }}
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 30
-
-      # Build Release (hanya di branch main)
-      - name: Build Release APK
-        if: github.ref == 'refs/heads/main'
-        run: ./gradlew assembleRelease
-        env:
-          KEYSTORE_PATH: ${{ secrets.KEYSTORE_PATH }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
-
-      - name: Upload Release APK
-        if: github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ujian-smkaltan-release-${{ github.run_number }}
-          path: app/build/outputs/apk/release/*.apk
-          retention-days: 90
