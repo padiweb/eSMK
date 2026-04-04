@@ -4,7 +4,49 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <!-- Spine buku -->
     <path
-        android:fillColor="#FFD600"
-        android:pathData="M54,20 L70,50 L90,50 L75,65 L80,88 L54,73 L28,88 L33,65 L18,50 L38,50 Z"/>
+        android:fillColor="#FFFFFF"
+        android:pathData="M34,22 L34,86 Q34,88 36,88 L38,88 Q40,88 40,86 L40,22 Q40,20 38,20 L36,20 Q34,20 34,22Z"
+        android:fillAlpha="0.5"/>
+
+    <!-- Cover buku -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M40,20 L72,20 Q76,20 76,24 L76,84 Q76,88 72,88 L40,88 L40,20Z"
+        android:fillAlpha="0.15"/>
+
+    <!-- Garis teks baris 1 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M46,32 L70,32 Q71,32 71,33.5 L71,35 Q71,36 70,36 L46,36 Q45,36 45,35 L45,33.5 Q45,32 46,32Z"/>
+
+    <!-- Garis teks baris 2 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M46,42 L66,42 Q67,42 67,43.5 L67,45 Q67,46 66,46 L46,46 Q45,46 45,45 L45,43.5 Q45,42 46,42Z"
+        android:fillAlpha="0.7"/>
+
+    <!-- Garis teks baris 3 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M46,52 L70,52 Q71,52 71,53.5 L71,55 Q71,56 70,56 L46,56 Q45,56 45,55 L45,53.5 Q45,52 46,52Z"
+        android:fillAlpha="0.7"/>
+
+    <!-- Garis teks baris 4 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M46,62 L62,62 Q63,62 63,63.5 L63,65 Q63,66 62,66 L46,66 Q45,66 45,65 L45,63.5 Q45,62 46,62Z"
+        android:fillAlpha="0.5"/>
+
+    <!-- Pembatas bawah buku -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M34,82 Q55,78 76,82"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:fillAlpha="0"/>
+
 </vector>
