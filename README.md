@@ -11,17 +11,17 @@ Dirancang untuk **Android versi 8+** dengan fitur keamanan berlapis.
 |-------|------------|
 | **Kiosk Mode** | Mengunci perangkat, tidak bisa keluar ke launcher |
 | **Blokir Screenshot** | `FLAG_SECURE` - tidak bisa screenshot/record |
-| **Blokir Overlay** | Monitoring window overlay dari app lain |
+| **Blokir Overlay** | Monitoring window overlay dari app lain, termasuk blokir AI dari sistem Android |
 | **Blokir Tombol** | Back, Home, Recents, Volume diblokir |
 | **Full Screen** | Status bar & navigation bar tersembunyi |
 | **Blokir Split Screen** | `resizeableActivity=false` |
 | **Foreground Service** | App tidak di-kill sistem Android |
 | **Custom User-Agent** | Website dapat mendeteksi app resmi |
-| **Blokir URL Eksternal** | Hanya domain ujiansmkaltan.sch.id |
+| **Blokir URL Eksternal** | Terbatas hanya untuk domain server ujian |
 | **Disable Copy-Paste** | Script diinjeksi ke halaman web |
-| **Device Admin** | Mode paling aman via ADB (opsional) |
+| **Device Admin** | Mode paling aman via ADB |
 
-# Padiweb Labs Developer
+### Padiweb Labs Developer
 
 ---
 
