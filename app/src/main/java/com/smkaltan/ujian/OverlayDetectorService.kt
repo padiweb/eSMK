@@ -11,13 +11,6 @@ import android.os.IBinder
 import android.os.Looper
 import androidx.core.app.NotificationCompat
 
-/**
- * OverlayDetectorService v2
- *
- * Deteksi foreground app menggunakan UsageStatsManager
- * (bekerja di Android 13+ menggantikan getRunningTasks yang diblokir)
- * + fallback ActivityManager untuk Android lama
- */
 class OverlayDetectorService : Service() {
 
     companion object {
@@ -32,34 +25,29 @@ class OverlayDetectorService : Service() {
     private var checkRunnable: Runnable? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) {
-            stopSelf(); return START_NOT_STICKY
-        }
+        if (intent?.action == ACTION_STOP) { stopSelf(); return START_NOT_STICKY }
         isRunning = true
         createNotificationChannel()
         startForeground(NOTIF_ID, buildNotification())
-        startOverlayCheck()
+        startCheck()
         return START_STICKY
     }
 
-    private fun startOverlayCheck() {
+    private fun startCheck() {
         checkRunnable = object : Runnable {
             override fun run() {
-                if (!isRunning || !ExamAccessibilityService.isExamActive) {
-                    handler.postDelayed(this, 2000)
-                    return
-                }
-                val topPackage = getForegroundApp()
-                if (topPackage != null && topPackage != packageName && !isSystemPackage(topPackage)) {
-                    val appName = getAppName(topPackage)
-                    // Laporkan ke MainActivity
-                    MainActivity.instance?.runOnUiThread {
-                        MainActivity.instance?.reportViolationToWeb(
-                            "Aplikasi lain dibuka: $appName [Mobile App]"
-                        )
+                if (!isRunning) return
+                if (ExamAccessibilityService.isExamActive) {
+                    val top = getForegroundApp()
+                    if (top != null && top != packageName && !isSystem(top)) {
+                        val name = getAppName(top)
+                        MainActivity.instance?.runOnUiThread {
+                            MainActivity.instance?.reportViolationToWeb(
+                                "Aplikasi lain dibuka: $name [Mobile App]"
+                            )
+                        }
+                        bringExamToFront()
                     }
-                    // Kembalikan app ujian ke depan
-                    bringExamToFront()
                 }
                 handler.postDelayed(this, 1500)
             }
@@ -68,92 +56,66 @@ class OverlayDetectorService : Service() {
     }
 
     private fun getForegroundApp(): String? {
-        // Android 13+ (API 33): pakai UsageStatsManager
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            getForegroundAppViaUsageStats()
-        } else {
-            getForegroundAppLegacy()
-        }
-    }
-
-    private fun getForegroundAppViaUsageStats(): String? {
+        // Android 5+ gunakan UsageStatsManager
         return try {
             val usm = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
             val now = System.currentTimeMillis()
-            val events = usm.queryEvents(now - 3000, now)
-            var lastPkg: String? = null
-            val event = UsageEvents.Event()
+            val events = usm.queryEvents(now - 3000L, now)
+            var last: String? = null
+            val ev = UsageEvents.Event()
             while (events.hasNextEvent()) {
-                events.getNextEvent(event)
-                if (event.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND) {
-                    lastPkg = event.packageName
+                events.getNextEvent(ev)
+                if (ev.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND) {
+                    last = ev.packageName
                 }
             }
-            lastPkg
-        } catch (e: Exception) { null }
-    }
-
-    @Suppress("DEPRECATION")
-    private fun getForegroundAppLegacy(): String? {
-        return try {
-            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-            am.getRunningTasks(1)?.firstOrNull()?.topActivity?.packageName
-        } catch (e: Exception) { null }
+            last
+        } catch (e: Exception) {
+            // Fallback untuk Android lama
+            try {
+                @Suppress("DEPRECATION")
+                val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                am.getRunningTasks(1)?.firstOrNull()?.topActivity?.packageName
+            } catch (e2: Exception) { null }
+        }
     }
 
     private fun bringExamToFront() {
         try {
-            val intent = Intent(this, MainActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
-                        Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            }
-            startActivity(intent)
+            startActivity(Intent(this, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            })
         } catch (e: Exception) { }
     }
 
     private fun getAppName(pkg: String): String {
-        return try {
-            val pm = applicationContext.packageManager
-            pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
-        } catch (e: Exception) { pkg }
+        return try { applicationContext.packageManager.run { getApplicationLabel(getApplicationInfo(pkg, 0)).toString() } } catch (e: Exception) { pkg }
     }
 
-    private fun isSystemPackage(pkg: String): Boolean {
-        val systemPkgs = listOf(
-            "com.smkaltan.ujian", "android", "com.android.systemui",
-            "com.android.launcher", "com.android.inputmethod",
-            "com.google.android.inputmethod", "com.samsung.android.honeyboard",
-            "com.swiftkey", "com.touchtype.swiftkey", "com.google.android.gms"
-        )
-        return systemPkgs.any { pkg.startsWith(it) }
+    private fun isSystem(pkg: String): Boolean {
+        val sys = listOf("com.smkaltan.ujian","android","com.android.systemui","com.android.launcher","com.android.inputmethod","com.google.android.inputmethod","com.samsung.android.honeyboard","com.swiftkey","com.touchtype.swiftkey","com.google.android.gms")
+        return sys.any { pkg.startsWith(it) }
     }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID, "Monitor Keamanan", NotificationManager.IMPORTANCE_MIN
-            ).apply { setShowBadge(false) }
-            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+            val ch = NotificationChannel(CHANNEL_ID, "Monitor Keamanan", NotificationManager.IMPORTANCE_MIN).apply { setShowBadge(false) }
+            getSystemService(NotificationManager::class.java).createNotificationChannel(ch)
         }
     }
 
     private fun buildNotification(): Notification {
-        val pi = PendingIntent.getActivity(
-            this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+        val pi = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("🔒 Ujian Berlangsung")
-            .setContentText("Monitor keamanan aktif")
+            .setContentTitle("🔒 Ujian Berlangsung").setContentText("Monitor aktif")
             .setSmallIcon(android.R.drawable.ic_lock_lock)
-            .setContentIntent(pi).setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_MIN).build()
+            .setContentIntent(pi).setOngoing(true).setPriority(NotificationCompat.PRIORITY_MIN).build()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        super.onDestroy()
-        isRunning = false
+        super.onDestroy(); isRunning = false
         checkRunnable?.let { handler.removeCallbacks(it) }
     }
 }
