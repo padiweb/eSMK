@@ -4,6 +4,13 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Untuk deteksi foreground app Android lama -->
+    <uses-permission android:name="android.permission.GET_TASKS" />
+    <!-- Untuk UsageStatsManager Android 13+ -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions"/>
     <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE"
         tools:ignore="ProtectedPermissions"/>
 
@@ -30,7 +37,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Accessibility Service untuk blokir overlay/floating window -->
+        <!-- Accessibility Service -->
         <service
             android:name=".ExamAccessibilityService"
             android:exported="true"
@@ -43,6 +50,12 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
         </service>
+
+        <!-- Foreground Detector Service -->
+        <service
+            android:name=".OverlayDetectorService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
     </application>
 
