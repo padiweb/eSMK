@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId = "com.smkaltan.ujian"
-        minSdk = 29        // Android 12
+        minSdk = 26        // Android 8
         targetSdk = 35     // Android 15
         versionCode = 1
         versionName = "1.0.0"
