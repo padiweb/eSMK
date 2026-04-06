@@ -9,28 +9,36 @@ android {
 
     defaultConfig {
         applicationId = "com.smkaltan.ujian"
-        minSdk = 26        // Android 8
-        targetSdk = 35     // Android 15
+        minSdk = 26
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // ── Paksa v1 + v2 + v3 signature untuk semua build ──
+    signingConfigs {
+        getByName("debug") {
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+            enableV4Signing = true
+        }
+    }
+
     buildTypes {
+        debug {
+            isDebuggable = true
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Signing config untuk release build
-            // signingConfig = signingConfigs.getByName("release")
-        }
-        debug {
-            isDebuggable = true
-            applicationIdSuffix = ".debug"
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
@@ -47,9 +55,17 @@ android {
         buildConfig = true
     }
 
-    // Disable split screen (tambahan keamanan)
-    defaultConfig {
-        manifestPlaceholders["resizeableActivity"] = false
+    // Pastikan APK support semua arsitektur CPU
+    splits {
+        abi {
+            isEnable = false
+        }
+    }
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
     }
 }
 
@@ -59,13 +75,9 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
-
-    // WebKit untuk WebView yang lebih aman
     implementation("androidx.webkit:webkit:1.12.1")
-
-    // Lifecycle untuk foreground service
     implementation("androidx.lifecycle:lifecycle-service:2.8.7")
-
+    implementation("androidx.core:core-ktx:1.15.0")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
