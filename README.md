@@ -1,11 +1,11 @@
-# 📱 Ujian SMK Altan - Android Kiosk App
+# 📱 eSMK Altan V.4 - Release App Mobile
 
 Aplikasi Android resmi untuk sistem ujian SMK Altan.  
-Dirancang untuk **Android 12+** dengan fitur keamanan berlapis.
+Dirancang untuk **Android versi 8+** dengan fitur keamanan berlapis.
 
 ---
 
-## 🔒 Fitur Keamanan
+## 🔒 Update Fitur Keamanan
 
 | Fitur | Keterangan |
 |-------|------------|
@@ -20,6 +20,8 @@ Dirancang untuk **Android 12+** dengan fitur keamanan berlapis.
 | **Blokir URL Eksternal** | Hanya domain ujiansmkaltan.sch.id |
 | **Disable Copy-Paste** | Script diinjeksi ke halaman web |
 | **Device Admin** | Mode paling aman via ADB (opsional) |
+
+# Padiweb Labs Developer
 
 ---
 
