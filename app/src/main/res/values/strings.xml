@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">E-SMK Altan</string>
+    <string name="app_name">eSMK Altan V.4</string>
     <string name="accessibility_service_label">Monitor Keamanan Ujian</string>
     <string name="accessibility_description">Memblokir floating window dan overlay aplikasi lain selama ujian berlangsung untuk mencegah kecurangan.</string>
 </resources>
