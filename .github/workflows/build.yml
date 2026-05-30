@@ -25,15 +25,15 @@ jobs:
       - name: Accept Android SDK licenses
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Install Android SDK
+      - name: Install Android SDK 36
         run: |
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
-            "platforms;android-35" \
-            "build-tools;35.0.0" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
             "platform-tools"
 
       - name: Generate Gradle Wrapper
-        run: gradle wrapper --gradle-version=8.9 --distribution-type=bin
+        run: gradle wrapper --gradle-version=8.11 --distribution-type=bin
 
       - name: Izinkan gradlew
         run: chmod +x gradlew
@@ -52,7 +52,7 @@ jobs:
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > $RUNNER_TEMP/esmk-release.jks
 
-      - name: Build Release APK (signed)
+      - name: Build Release APK
         run: ./gradlew assembleRelease --stacktrace
         env:
           KEYSTORE_PATH: ${{ runner.temp }}/esmk-release.jks
