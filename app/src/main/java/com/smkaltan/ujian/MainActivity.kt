@@ -1,12 +1,9 @@
 package com.smkaltan.ujian
 
 import android.annotation.SuppressLint
-import android.app.ActivityManager
 import android.app.usage.UsageStatsManager
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
@@ -40,15 +37,6 @@ class MainActivity : AppCompatActivity() {
     private var lastViolationTime = 0L
     private val VIOLATION_COOLDOWN = 5000L
 
-    // Receiver untuk tangkap tombol Home
-    private val homeReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (!isExamFinished) {
-                handler.postDelayed({ bringAppToFront() }, 200)
-            }
-        }
-    }
-
     companion object {
         const val EXAM_URL = "https://ujian.smkaltan.sch.id/login.php"
         var instance: MainActivity? = null
@@ -59,11 +47,9 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         instance = this
 
-        // Cegah screenshot + jaga layar tetap nyala
         window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        // Tampilkan di atas lockscreen (untuk bring to front)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
@@ -78,16 +64,10 @@ class MainActivity : AppCompatActivity() {
         buildUI()
         setupFullScreen()
         setupWebView()
-        registerHomeReceiver()
 
-        // Cek permission accessibility
-        if (!isAccessibilityServiceEnabled()) {
-            showAccessibilityPermissionDialog()
-        } else {
-            ExamAccessibilityService.isExamActive = true
-        }
+        if (!isAccessibilityServiceEnabled()) showAccessibilityPermissionDialog()
+        else ExamAccessibilityService.isExamActive = true
 
-        // Cek usage stats — tunda 1 detik
         handler.postDelayed({
             if (!isFinishing && !isDestroyed && !isUsageStatsPermissionGranted()) {
                 showUsageStatsPermissionDialog()
@@ -98,28 +78,12 @@ class MainActivity : AppCompatActivity() {
         startOverlayDetectorService()
     }
 
-    private fun registerHomeReceiver() {
-        try {
-            val filter = IntentFilter(Intent.ACTION_CLOSE_SYSTEM_DIALOGS)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                registerReceiver(homeReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-            } else {
-                @Suppress("UnspecifiedRegisterReceiverFlag")
-                registerReceiver(homeReceiver, filter)
-            }
-        } catch (e: Exception) { }
-    }
-
     private fun buildUI() {
-        val root = FrameLayout(this).apply {
-            setBackgroundColor(0xFF1a237e.toInt())
-        }
+        val root = FrameLayout(this).apply { setBackgroundColor(0xFF1a237e.toInt()) }
 
         webView = WebView(this).apply {
             layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
         }
         root.addView(webView)
 
@@ -128,16 +92,15 @@ class MainActivity : AppCompatActivity() {
             gravity = android.view.Gravity.CENTER
             setBackgroundColor(0xFF1a237e.toInt())
             layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
         }
         loadingLayout.addView(TextView(this).apply {
             text = "📖"; textSize = 56f; gravity = android.view.Gravity.CENTER; setPadding(0, 0, 0, 16)
         })
         loadingLayout.addView(TextView(this).apply {
             text = "Ujian SMK Altan"; setTextColor(0xFFFFFFFF.toInt()); textSize = 22f
-            typeface = android.graphics.Typeface.DEFAULT_BOLD; gravity = android.view.Gravity.CENTER; setPadding(0, 0, 0, 8)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = android.view.Gravity.CENTER; setPadding(0, 0, 0, 8)
         })
         loadingLayout.addView(TextView(this).apply {
             text = "Sistem Ujian Online"; setTextColor(0xAAFFFFFF.toInt()); textSize = 13f
@@ -181,42 +144,11 @@ class MainActivity : AppCompatActivity() {
             override fun run() {
                 if (!isExamFinished) {
                     setupFullScreen()
-                    // Kalau app tidak di foreground, paksa kembali
-                    if (!hasWindowFocus()) {
-                        bringAppToFront()
-                    }
                     handler.postDelayed(this, 1000)
                 }
             }
         }
         handler.post(securityRunnable!!)
-    }
-
-    private fun bringAppToFront() {
-        try {
-            val intent = Intent(this, MainActivity::class.java).apply {
-                addFlags(
-                    Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP
-                )
-            }
-            startActivity(intent)
-        } catch (e: Exception) { }
-    }
-
-    fun reportViolationToWeb(reason: String) {
-        if (isExamFinished) return
-        val now = System.currentTimeMillis()
-        if (now - lastViolationTime < VIOLATION_COOLDOWN) return
-        lastViolationTime = now
-        val escaped = reason.replace("'", "\\'").replace("\n", " ")
-        runOnUiThread {
-            webView.evaluateJavascript(
-                "if(typeof window.reportMobileViolation==='function'){window.reportMobileViolation('$escaped');}",
-                null
-            )
-        }
     }
 
     private fun startOverlayDetectorService() {
@@ -235,6 +167,20 @@ class MainActivity : AppCompatActivity() {
                 action = OverlayDetectorService.ACTION_STOP
             })
         } catch (e: Exception) { }
+    }
+
+    fun reportViolationToWeb(reason: String) {
+        if (isExamFinished) return
+        val now = System.currentTimeMillis()
+        if (now - lastViolationTime < VIOLATION_COOLDOWN) return
+        lastViolationTime = now
+        val escaped = reason.replace("'", "\\'").replace("\n", " ")
+        runOnUiThread {
+            webView.evaluateJavascript(
+                "if(typeof window.reportMobileViolation==='function'){window.reportMobileViolation('$escaped');}",
+                null
+            )
+        }
     }
 
     private fun isUsageStatsPermissionGranted(): Boolean {
@@ -299,8 +245,7 @@ class MainActivity : AppCompatActivity() {
 
         webView.webViewClient = object : WebViewClient() {
             override fun onPageStarted(v: WebView?, u: String?, f: android.graphics.Bitmap?) {
-                loadingLayout.visibility = View.VISIBLE
-                updateStatus("Memuat...")
+                loadingLayout.visibility = View.VISIBLE; updateStatus("Memuat...")
             }
             override fun onPageFinished(v: WebView?, u: String?) {
                 loadingLayout.visibility = View.GONE
@@ -323,8 +268,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             override fun onReceivedSslError(v: WebView?, h: SslErrorHandler?, e: android.net.http.SslError?) {
-                val url = v?.url ?: ""
-                if (url.contains("smkaltan.sch.id")) h?.proceed() else h?.cancel()
+                if (v?.url?.contains("smkaltan.sch.id") == true) h?.proceed() else h?.cancel()
             }
             override fun shouldOverrideUrlLoading(v: WebView?, r: WebResourceRequest?): Boolean {
                 val url = r?.url?.toString() ?: return false
@@ -382,7 +326,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateStatus(msg: String) { runOnUiThread { statusText.text = msg } }
 
-    // Blokir tombol fisik saat ujian
+    // ── Blokir semua tombol fisik saat ujian ──
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (isExamFinished) return super.onKeyDown(keyCode, event)
         return when (keyCode) {
@@ -390,37 +334,30 @@ class MainActivity : AppCompatActivity() {
             KeyEvent.KEYCODE_HOME,
             KeyEvent.KEYCODE_APP_SWITCH,
             KeyEvent.KEYCODE_MENU,
-            KeyEvent.KEYCODE_SEARCH,
-            KeyEvent.KEYCODE_POWER -> true // blokir tombol power juga
+            KeyEvent.KEYCODE_SEARCH -> true
             else -> super.onKeyDown(keyCode, event)
+        }
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        if (isExamFinished) return super.onKeyUp(keyCode, event)
+        return when (keyCode) {
+            KeyEvent.KEYCODE_HOME,
+            KeyEvent.KEYCODE_APP_SWITCH,
+            KeyEvent.KEYCODE_MENU -> true
+            else -> super.onKeyUp(keyCode, event)
         }
     }
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (!isExamFinished && webView.canGoBack()) webView.goBack()
+        // tidak panggil super → back tidak bisa keluar app
     }
 
-    // Kalau app kehilangan fokus → paksa kembali ke depan
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         setupFullScreen()
-        if (!hasFocus && !isExamFinished) {
-            handler.postDelayed({
-                if (!isExamFinished) bringAppToFront()
-            }, 300)
-        }
-    }
-
-    // Kalau app di-pause (misal Home ditekan) → paksa kembali
-    override fun onPause() {
-        super.onPause()
-        webView.onPause()
-        if (!isExamFinished) {
-            handler.postDelayed({
-                if (!isExamFinished) bringAppToFront()
-            }, 500)
-        }
     }
 
     override fun onResume() {
@@ -430,13 +367,17 @@ class MainActivity : AppCompatActivity() {
         if (isAccessibilityServiceEnabled()) ExamAccessibilityService.isExamActive = true
     }
 
+    override fun onPause() {
+        super.onPause()
+        webView.onPause()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         instance = null
         ExamAccessibilityService.isExamActive = false
         stopOverlayDetectorService()
         securityRunnable?.let { handler.removeCallbacks(it) }
-        try { unregisterReceiver(homeReceiver) } catch (e: Exception) { }
         webView.stopLoading()
         webView.destroy()
     }
