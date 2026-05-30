@@ -1,4 +1,4 @@
-name: Build Release AAB (Play Store)
+name: Build APK Release
 
 on:
   push:
@@ -48,35 +48,21 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      # ── Decode keystore dari GitHub Secret ──
       - name: Decode Keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > $RUNNER_TEMP/esmk-release.jks
 
-      # ── Build AAB Release + Sign via Gradle (cara yang benar) ──
-      - name: Build & Sign Release AAB
-        run: ./gradlew bundleRelease --stacktrace
+      - name: Build Release APK (signed)
+        run: ./gradlew assembleRelease --stacktrace
         env:
           KEYSTORE_PATH: ${{ runner.temp }}/esmk-release.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      # ── Upload AAB siap Play Store ──
-      - name: Upload Release AAB
+      - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: eSMK-release-aab-${{ github.run_number }}
-          path: app/build/outputs/bundle/release/app-release.aab
-          retention-days: 30
-
-      # ── Bonus: build APK debug untuk testing di HP ──
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace
-
-      - name: Upload Debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: eSMK-debug-apk-${{ github.run_number }}
-          path: app/build/outputs/apk/debug/*.apk
-          retention-days: 14
+          name: eSMK-Altan-v${{ github.run_number }}
+          path: app/build/outputs/apk/release/app-release.apk
+          retention-days: 90
