@@ -53,29 +53,63 @@ class MainActivity : AppCompatActivity() {
         setupFullScreen()
         setupWebView()
         startKioskMode()
-        if (!isAccessibilityServiceEnabled()) showAccessibilityPermissionDialog()
-        else ExamAccessibilityService.isExamActive = true
-        if (!isUsageStatsPermissionGranted()) showUsageStatsPermissionDialog()
+
+        // Cek permission accessibility — tampilkan dialog jika belum aktif
+        if (!isAccessibilityServiceEnabled()) {
+            showAccessibilityPermissionDialog()
+        } else {
+            ExamAccessibilityService.isExamActive = true
+        }
+
+        // Cek permission usage stats — tampilkan dialog jika belum aktif
+        if (!isUsageStatsPermissionGranted()) {
+            showUsageStatsPermissionDialog()
+        }
+
         startSecurityMonitor()
         startOverlayDetectorService()
     }
 
     private fun buildUI() {
-        val root = FrameLayout(this).apply { setBackgroundColor(0xFF1a237e.toInt()) }
+        val root = FrameLayout(this).apply {
+            setBackgroundColor(0xFF1a237e.toInt())
+        }
+
         webView = WebView(this).apply {
-            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
         }
         root.addView(webView)
+
         loadingLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL; gravity = android.view.Gravity.CENTER
+            orientation = LinearLayout.VERTICAL
+            gravity = android.view.Gravity.CENTER
             setBackgroundColor(0xFF1a237e.toInt())
-            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
         }
-        loadingLayout.addView(TextView(this).apply { text = "📖"; textSize = 56f; gravity = android.view.Gravity.CENTER; setPadding(0,0,0,16) })
-        loadingLayout.addView(TextView(this).apply { text = "Ujian SMK Altan"; setTextColor(0xFFFFFFFF.toInt()); textSize = 22f; typeface = android.graphics.Typeface.DEFAULT_BOLD; gravity = android.view.Gravity.CENTER; setPadding(0,0,0,8) })
-        loadingLayout.addView(TextView(this).apply { text = "Sistem Ujian Online"; setTextColor(0xAAFFFFFF.toInt()); textSize = 13f; gravity = android.view.Gravity.CENTER; setPadding(0,0,0,32) })
-        loadingLayout.addView(ProgressBar(this).apply { layoutParams = LinearLayout.LayoutParams(80, 80).apply { bottomMargin = 20 } })
-        statusText = TextView(this).apply { text = "Memuat..."; setTextColor(0xAAFFFFFF.toInt()); textSize = 13f; gravity = android.view.Gravity.CENTER }
+
+        loadingLayout.addView(TextView(this).apply {
+            text = "📖"; textSize = 56f; gravity = android.view.Gravity.CENTER; setPadding(0, 0, 0, 16)
+        })
+        loadingLayout.addView(TextView(this).apply {
+            text = "Ujian SMK Altan"; setTextColor(0xFFFFFFFF.toInt()); textSize = 22f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD; gravity = android.view.Gravity.CENTER; setPadding(0, 0, 0, 8)
+        })
+        loadingLayout.addView(TextView(this).apply {
+            text = "Sistem Ujian Online"; setTextColor(0xAAFFFFFF.toInt()); textSize = 13f
+            gravity = android.view.Gravity.CENTER; setPadding(0, 0, 0, 32)
+        })
+        loadingLayout.addView(ProgressBar(this).apply {
+            layoutParams = LinearLayout.LayoutParams(80, 80).apply { bottomMargin = 20 }
+        })
+        statusText = TextView(this).apply {
+            text = "Memuat..."; setTextColor(0xAAFFFFFF.toInt()); textSize = 13f; gravity = android.view.Gravity.CENTER
+        }
         loadingLayout.addView(statusText)
         root.addView(loadingLayout)
         setContentView(root)
@@ -91,29 +125,47 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showUsageStatsPermissionDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("⚠️ Izin Monitoring Diperlukan")
-            .setMessage("Untuk mendeteksi aplikasi lain yang dibuka saat ujian, aktifkan izin 'Penggunaan Aplikasi'.\n\nLangkah:\n1. Klik OK\n2. Cari 'Ujian SMK Altan'\n3. Aktifkan\n4. Kembali ke aplikasi")
-            .setCancelable(false)
-            .setPositiveButton("OK, Aktifkan") { _, _ -> startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
-            .setNegativeButton("Lewati") { _, _ -> }.show()
+        // Tunda dialog agar tidak tumpuk dengan dialog accessibility
+        handler.postDelayed({
+            if (!isFinishing && !isDestroyed) {
+                AlertDialog.Builder(this)
+                    .setTitle("⚠️ Izin Monitoring Diperlukan")
+                    .setMessage("Untuk mendeteksi aplikasi lain yang dibuka saat ujian, aktifkan izin 'Penggunaan Aplikasi'.\n\nLangkah:\n1. Klik OK\n2. Cari 'eSMK Altan'\n3. Aktifkan\n4. Kembali ke aplikasi")
+                    .setCancelable(false)
+                    .setPositiveButton("OK, Aktifkan") { _, _ ->
+                        startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+                    }
+                    .setNegativeButton("Lewati") { _, _ -> }
+                    .show()
+            }
+        }, if (isAccessibilityServiceEnabled()) 0L else 1000L)
     }
 
     private fun isAccessibilityServiceEnabled(): Boolean {
         val service = "${packageName}/${ExamAccessibilityService::class.java.canonicalName}"
-        val enabled = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: return false
-        val sp = TextUtils.SimpleStringSplitter(':'); sp.setString(enabled)
-        while (sp.hasNext()) { if (sp.next().equals(service, ignoreCase = true)) return true }
+        val enabled = Settings.Secure.getString(
+            contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ) ?: return false
+        val sp = TextUtils.SimpleStringSplitter(':')
+        sp.setString(enabled)
+        while (sp.hasNext()) {
+            if (sp.next().equals(service, ignoreCase = true)) return true
+        }
         return false
     }
 
     private fun showAccessibilityPermissionDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("⚠️ Izin Keamanan Diperlukan")
-            .setMessage("Untuk memblokir floating window saat ujian, aktifkan izin Accessibility.\n\nLangkah:\n1. Klik OK\n2. Cari 'Ujian SMK Altan'\n3. Aktifkan\n4. Kembali ke aplikasi")
-            .setCancelable(false)
-            .setPositiveButton("OK, Aktifkan") { _, _ -> startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
-            .setNegativeButton("Lewati") { _, _ -> }.show()
+        if (!isFinishing && !isDestroyed) {
+            AlertDialog.Builder(this)
+                .setTitle("⚠️ Izin Keamanan Diperlukan")
+                .setMessage("Untuk memblokir floating window saat ujian, aktifkan izin Accessibility.\n\nLangkah:\n1. Klik OK\n2. Cari 'eSMK Altan'\n3. Aktifkan\n4. Kembali ke aplikasi")
+                .setCancelable(false)
+                .setPositiveButton("OK, Aktifkan") { _, _ ->
+                    startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                }
+                .setNegativeButton("Lewati") { _, _ -> }
+                .show()
+        }
     }
 
     private fun setupFullScreen() {
@@ -124,11 +176,17 @@ class MainActivity : AppCompatActivity() {
             }
         } else {
             @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            window.decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            )
         }
     }
 
-    private fun startKioskMode() { try { startLockTask() } catch (e: Exception) { } }
+    private fun startKioskMode() {
+        try { startLockTask() } catch (e: Exception) { /* device mungkin tidak support kiosk */ }
+    }
 
     private fun startSecurityMonitor() {
         securityRunnable = object : Runnable {
@@ -136,7 +194,7 @@ class MainActivity : AppCompatActivity() {
                 if (!isExamFinished) {
                     setupFullScreen()
                     checkForegroundApp()
-                    handler.postDelayed(this, 1000)
+                    handler.postDelayed(this, 1500)
                 }
             }
         }
@@ -152,25 +210,37 @@ class MainActivity : AppCompatActivity() {
             if (tasks.isNotEmpty()) {
                 val top = tasks[0].topActivity?.packageName ?: return
                 if (top != packageName) {
-                    triggerViolation("Aplikasi lain dibuka: ${getAppName(top)} [Mobile App]")
+                    triggerViolation("Aplikasi lain dibuka: ${getAppName(top)}")
                     bringAppToFront()
                 }
             }
-        } catch (e: Exception) { }
+        } catch (e: Exception) { /* abaikan error permission */ }
     }
 
     private fun startOverlayDetectorService() {
         try {
-            val i = Intent(this, OverlayDetectorService::class.java).apply { action = OverlayDetectorService.ACTION_START }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(i) else startService(i)
+            val i = Intent(this, OverlayDetectorService::class.java).apply {
+                action = OverlayDetectorService.ACTION_START
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(i)
+            } else {
+                startService(i)
+            }
         } catch (e: Exception) { }
     }
 
     private fun stopOverlayDetectorService() {
-        try { startService(Intent(this, OverlayDetectorService::class.java).apply { action = OverlayDetectorService.ACTION_STOP }) } catch (e: Exception) { }
+        try {
+            startService(Intent(this, OverlayDetectorService::class.java).apply {
+                action = OverlayDetectorService.ACTION_STOP
+            })
+        } catch (e: Exception) { }
     }
 
-    fun reportViolationToWeb(reason: String) { triggerViolation(reason) }
+    fun reportViolationToWeb(reason: String) {
+        triggerViolation(reason)
+    }
 
     private fun triggerViolation(reason: String) {
         if (isExamFinished) return
@@ -179,103 +249,217 @@ class MainActivity : AppCompatActivity() {
         lastViolationTime = now
         val escaped = reason.replace("'", "\\'").replace("\n", " ")
         runOnUiThread {
-            webView.evaluateJavascript("if(typeof window.reportMobileViolation==='function'){window.reportMobileViolation('$escaped');}", null)
+            webView.evaluateJavascript(
+                "if(typeof window.reportMobileViolation==='function'){window.reportMobileViolation('$escaped');}",
+                null
+            )
         }
     }
 
     private fun bringAppToFront() {
         try {
             startActivity(Intent(this, MainActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP
+                )
             })
         } catch (e: Exception) { }
     }
 
     private fun getAppName(pkg: String): String {
-        return try { packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString() } catch (e: Exception) { pkg }
+        return try {
+            packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
+        } catch (e: Exception) { pkg }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
-        webView.clearCache(true); webView.clearHistory()
+        webView.clearCache(true)
+        webView.clearHistory()
         webView.settings.apply {
-            javaScriptEnabled = true; domStorageEnabled = true; databaseEnabled = true
-            allowFileAccess = false; allowContentAccess = false
-            setSupportZoom(true); builtInZoomControls = false; displayZoomControls = false
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            databaseEnabled = true
+            allowFileAccess = false
+            allowContentAccess = false
+            setSupportZoom(true)
+            builtInZoomControls = false
+            displayZoomControls = false
             loadsImagesAutomatically = true
             mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
             cacheMode = WebSettings.LOAD_DEFAULT
-            userAgentString = "Mozilla/5.0 (Linux; Android ${Build.VERSION.RELEASE}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 UjianSMKAltan/1.0"
+            userAgentString = "Mozilla/5.0 (Linux; Android ${Build.VERSION.RELEASE}) " +
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 " +
+                "Mobile Safari/537.36 UjianSMKAltan/1.0"
         }
+
         webView.webViewClient = object : WebViewClient() {
-            override fun onPageStarted(v: WebView?, u: String?, f: android.graphics.Bitmap?) { loadingLayout.visibility = View.VISIBLE; updateStatus("Memuat...") }
+            override fun onPageStarted(v: WebView?, u: String?, f: android.graphics.Bitmap?) {
+                loadingLayout.visibility = View.VISIBLE
+                updateStatus("Memuat...")
+            }
+
             override fun onPageFinished(v: WebView?, u: String?) {
                 loadingLayout.visibility = View.GONE
-                webView.evaluateJavascript("(function(){window.isNativeApp=true;document.addEventListener('contextmenu',function(e){e.preventDefault();});document.addEventListener('selectstart',function(e){e.preventDefault();});document.addEventListener('copy',function(e){e.preventDefault();});document.addEventListener('cut',function(e){e.preventDefault();});})();", null)
+                // Inject JS: disable context menu, copy, select
+                webView.evaluateJavascript("""
+                    (function(){
+                        window.isNativeApp = true;
+                        document.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+                        document.addEventListener('selectstart', function(e){ e.preventDefault(); });
+                        document.addEventListener('copy', function(e){ e.preventDefault(); });
+                        document.addEventListener('cut', function(e){ e.preventDefault(); });
+                    })();
+                """.trimIndent(), null)
                 ExamAccessibilityService.isExamActive = true
             }
+
             override fun onReceivedError(v: WebView?, r: WebResourceRequest?, e: WebResourceError?) {
                 if (r?.isForMainFrame == true) {
-                    loadingLayout.visibility = View.VISIBLE; updateStatus("Gagal memuat. Mencoba ulang...")
+                    loadingLayout.visibility = View.VISIBLE
+                    updateStatus("Gagal memuat. Mencoba ulang dalam 3 detik...")
                     handler.postDelayed({ webView.reload() }, 3000)
                 }
             }
-            override fun onReceivedSslError(v: WebView?, h: SslErrorHandler?, e: android.net.http.SslError?) { h?.proceed() }
-            override fun shouldOverrideUrlLoading(v: WebView?, r: WebResourceRequest?) = false
+
+            // PERBAIKAN: handle SSL error dengan benar, bukan langsung proceed
+            override fun onReceivedSslError(v: WebView?, h: SslErrorHandler?, e: android.net.http.SslError?) {
+                // Izinkan hanya untuk domain ujian.smkaltan.sch.id
+                val url = v?.url ?: ""
+                if (url.contains("smkaltan.sch.id")) {
+                    h?.proceed()
+                } else {
+                    h?.cancel()
+                }
+            }
+
+            override fun shouldOverrideUrlLoading(v: WebView?, r: WebResourceRequest?): Boolean {
+                // Hanya izinkan URL dari domain smkaltan
+                val url = r?.url?.toString() ?: return false
+                return !url.contains("smkaltan.sch.id")
+            }
         }
+
         webView.webChromeClient = object : WebChromeClient() {
-            override fun onProgressChanged(v: WebView?, p: Int) { if (p < 100) updateStatus("Memuat... $p%") else loadingLayout.visibility = View.GONE }
+            override fun onProgressChanged(v: WebView?, p: Int) {
+                if (p < 100) updateStatus("Memuat... $p%")
+                else loadingLayout.visibility = View.GONE
+            }
             override fun onPermissionRequest(r: PermissionRequest?) { r?.deny() }
         }
+
         webView.addJavascriptInterface(object : Any() {
-            @JavascriptInterface fun examFinished() { runOnUiThread { showFinishDialog() } }
-            @JavascriptInterface fun getDeviceInfo(): String = """{"platform":"android","version":"${Build.VERSION.RELEASE}","isApp":true}"""
+            @JavascriptInterface
+            fun examFinished() {
+                runOnUiThread { showFinishDialog() }
+            }
+
+            @JavascriptInterface
+            fun getDeviceInfo(): String {
+                return """{"platform":"android","version":"${Build.VERSION.RELEASE}","isApp":true}"""
+            }
         }, "AndroidBridge")
-        if (isNetworkAvailable()) webView.loadUrl(EXAM_URL) else showNoNetworkDialog()
+
+        if (isNetworkAvailable()) {
+            webView.loadUrl(EXAM_URL)
+        } else {
+            showNoNetworkDialog()
+        }
     }
 
     private fun isNetworkAvailable(): Boolean {
         val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        return cm.getNetworkCapabilities(cm.activeNetwork)?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+        return cm.getNetworkCapabilities(cm.activeNetwork)
+            ?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
     }
 
     private fun showNoNetworkDialog() {
         updateStatus("Tidak ada koneksi internet!")
-        AlertDialog.Builder(this).setTitle("Koneksi Diperlukan").setMessage("Pastikan WiFi atau data seluler aktif.").setCancelable(false)
-            .setPositiveButton("Coba Lagi") { _, _ -> if (isNetworkAvailable()) webView.loadUrl(EXAM_URL) else showNoNetworkDialog() }.show()
+        if (!isFinishing && !isDestroyed) {
+            AlertDialog.Builder(this)
+                .setTitle("Koneksi Diperlukan")
+                .setMessage("Pastikan WiFi atau data seluler aktif, lalu coba lagi.")
+                .setCancelable(false)
+                .setPositiveButton("Coba Lagi") { _, _ ->
+                    if (isNetworkAvailable()) webView.loadUrl(EXAM_URL)
+                    else showNoNetworkDialog()
+                }
+                .show()
+        }
     }
 
     private fun showFinishDialog() {
-        isExamFinished = true; ExamAccessibilityService.isExamActive = false; stopOverlayDetectorService()
-        AlertDialog.Builder(this).setTitle("Ujian Selesai").setMessage("Ujian telah selesai. Terima kasih!").setCancelable(false)
-            .setPositiveButton("Keluar") { _, _ -> try { stopLockTask() } catch (e: Exception) { }; finish() }.show()
+        isExamFinished = true
+        ExamAccessibilityService.isExamActive = false
+        stopOverlayDetectorService()
+        if (!isFinishing && !isDestroyed) {
+            AlertDialog.Builder(this)
+                .setTitle("Ujian Selesai")
+                .setMessage("Ujian telah selesai. Terima kasih!")
+                .setCancelable(false)
+                .setPositiveButton("Keluar") { _, _ ->
+                    try { stopLockTask() } catch (e: Exception) { }
+                    finish()
+                }
+                .show()
+        }
     }
 
-    private fun updateStatus(msg: String) { runOnUiThread { statusText.text = msg } }
+    private fun updateStatus(msg: String) {
+        runOnUiThread { statusText.text = msg }
+    }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (isExamFinished) return super.onKeyDown(keyCode, event)
         return when (keyCode) {
-            KeyEvent.KEYCODE_BACK -> { if (webView.canGoBack()) webView.goBack(); true }
-            KeyEvent.KEYCODE_HOME, KeyEvent.KEYCODE_APP_SWITCH, KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SEARCH -> true
+            KeyEvent.KEYCODE_BACK -> {
+                if (webView.canGoBack()) webView.goBack()
+                true
+            }
+            KeyEvent.KEYCODE_HOME,
+            KeyEvent.KEYCODE_APP_SWITCH,
+            KeyEvent.KEYCODE_MENU,
+            KeyEvent.KEYCODE_SEARCH -> true
             else -> super.onKeyDown(keyCode, event)
         }
     }
 
-    @Deprecated("Deprecated") override fun onBackPressed() { if (!isExamFinished && webView.canGoBack()) webView.goBack() }
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        if (!isExamFinished && webView.canGoBack()) webView.goBack()
+    }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus); setupFullScreen()
-        if (!hasFocus && !isExamFinished) handler.postDelayed({ if (!hasWindowFocus() && !isExamFinished) bringAppToFront() }, 500)
+        super.onWindowFocusChanged(hasFocus)
+        setupFullScreen()
+        if (!hasFocus && !isExamFinished) {
+            handler.postDelayed({
+                if (!hasWindowFocus() && !isExamFinished) bringAppToFront()
+            }, 500)
+        }
     }
 
     override fun onResume() {
-        super.onResume(); setupFullScreen(); webView.onResume()
+        super.onResume()
+        setupFullScreen()
+        webView.onResume()
         if (isAccessibilityServiceEnabled()) ExamAccessibilityService.isExamActive = true
     }
-    override fun onPause() { super.onPause(); webView.onPause() }
+
+    override fun onPause() {
+        super.onPause()
+        webView.onPause()
+    }
+
     override fun onDestroy() {
-        super.onDestroy(); instance = null; ExamAccessibilityService.isExamActive = false
-        stopOverlayDetectorService(); securityRunnable?.let { handler.removeCallbacks(it) }; webView.destroy()
+        super.onDestroy()
+        instance = null
+        ExamAccessibilityService.isExamActive = false
+        stopOverlayDetectorService()
+        securityRunnable?.let { handler.removeCallbacks(it) }
+        webView.stopLoading()
+        webView.destroy()
     }
 }
