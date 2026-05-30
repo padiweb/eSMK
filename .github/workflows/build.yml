@@ -53,8 +53,8 @@ jobs:
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > $RUNNER_TEMP/esmk-release.jks
 
-      # ── Build AAB Release (format wajib Play Store) ──
-      - name: Build Release AAB
+      # ── Build AAB Release + Sign via Gradle (cara yang benar) ──
+      - name: Build & Sign Release AAB
         run: ./gradlew bundleRelease --stacktrace
         env:
           KEYSTORE_PATH: ${{ runner.temp }}/esmk-release.jks
@@ -62,26 +62,15 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      # ── Sign AAB dengan keystore release ──
-      - name: Sign AAB
-        run: |
-          $ANDROID_HOME/build-tools/35.0.0/apksigner sign \
-            --ks $RUNNER_TEMP/esmk-release.jks \
-            --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} \
-            --ks-key-alias ${{ secrets.KEY_ALIAS }} \
-            --key-pass pass:${{ secrets.KEY_PASSWORD }} \
-            --out app/build/outputs/bundle/release/app-release-signed.aab \
-            app/build/outputs/bundle/release/app-release.aab
-
       # ── Upload AAB siap Play Store ──
       - name: Upload Release AAB
         uses: actions/upload-artifact@v4
         with:
           name: eSMK-release-aab-${{ github.run_number }}
-          path: app/build/outputs/bundle/release/app-release-signed.aab
+          path: app/build/outputs/bundle/release/app-release.aab
           retention-days: 30
 
-      # ── Bonus: build APK debug juga untuk testing ──
+      # ── Bonus: build APK debug untuk testing di HP ──
       - name: Build Debug APK
         run: ./gradlew assembleDebug --stacktrace
 
