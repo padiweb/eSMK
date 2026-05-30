@@ -47,24 +47,34 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         instance = this
-        window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
+
+        // Cegah screenshot
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_SECURE,
+            WindowManager.LayoutParams.FLAG_SECURE
+        )
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
         buildUI()
         setupFullScreen()
         setupWebView()
-        startKioskMode()
 
-        // Cek permission accessibility — tampilkan dialog jika belum aktif
+        // DIHAPUS: startLockTask() — penyebab crash/force close
+        // Kiosk mode butuh Device Owner permission yang tidak bisa didapat tanpa MDM
+
+        // Cek permission accessibility
         if (!isAccessibilityServiceEnabled()) {
             showAccessibilityPermissionDialog()
         } else {
             ExamAccessibilityService.isExamActive = true
         }
 
-        // Cek permission usage stats — tampilkan dialog jika belum aktif
-        if (!isUsageStatsPermissionGranted()) {
-            showUsageStatsPermissionDialog()
-        }
+        // Cek permission usage stats — tunda 1 detik agar tidak tumpuk
+        handler.postDelayed({
+            if (!isFinishing && !isDestroyed && !isUsageStatsPermissionGranted()) {
+                showUsageStatsPermissionDialog()
+            }
+        }, 1000)
 
         startSecurityMonitor()
         startOverlayDetectorService()
@@ -94,21 +104,34 @@ class MainActivity : AppCompatActivity() {
         }
 
         loadingLayout.addView(TextView(this).apply {
-            text = "📖"; textSize = 56f; gravity = android.view.Gravity.CENTER; setPadding(0, 0, 0, 16)
+            text = "📖"
+            textSize = 56f
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 0, 0, 16)
         })
         loadingLayout.addView(TextView(this).apply {
-            text = "Ujian SMK Altan"; setTextColor(0xFFFFFFFF.toInt()); textSize = 22f
-            typeface = android.graphics.Typeface.DEFAULT_BOLD; gravity = android.view.Gravity.CENTER; setPadding(0, 0, 0, 8)
+            text = "Ujian SMK Altan"
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 22f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 0, 0, 8)
         })
         loadingLayout.addView(TextView(this).apply {
-            text = "Sistem Ujian Online"; setTextColor(0xAAFFFFFF.toInt()); textSize = 13f
-            gravity = android.view.Gravity.CENTER; setPadding(0, 0, 0, 32)
+            text = "Sistem Ujian Online"
+            setTextColor(0xAAFFFFFF.toInt())
+            textSize = 13f
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 0, 0, 32)
         })
         loadingLayout.addView(ProgressBar(this).apply {
             layoutParams = LinearLayout.LayoutParams(80, 80).apply { bottomMargin = 20 }
         })
         statusText = TextView(this).apply {
-            text = "Memuat..."; setTextColor(0xAAFFFFFF.toInt()); textSize = 13f; gravity = android.view.Gravity.CENTER
+            text = "Memuat..."
+            setTextColor(0xAAFFFFFF.toInt())
+            textSize = 13f
+            gravity = android.view.Gravity.CENTER
         }
         loadingLayout.addView(statusText)
         root.addView(loadingLayout)
@@ -125,20 +148,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showUsageStatsPermissionDialog() {
-        // Tunda dialog agar tidak tumpuk dengan dialog accessibility
-        handler.postDelayed({
-            if (!isFinishing && !isDestroyed) {
-                AlertDialog.Builder(this)
-                    .setTitle("⚠️ Izin Monitoring Diperlukan")
-                    .setMessage("Untuk mendeteksi aplikasi lain yang dibuka saat ujian, aktifkan izin 'Penggunaan Aplikasi'.\n\nLangkah:\n1. Klik OK\n2. Cari 'eSMK Altan'\n3. Aktifkan\n4. Kembali ke aplikasi")
-                    .setCancelable(false)
-                    .setPositiveButton("OK, Aktifkan") { _, _ ->
-                        startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
-                    }
-                    .setNegativeButton("Lewati") { _, _ -> }
-                    .show()
+        AlertDialog.Builder(this)
+            .setTitle("⚠️ Izin Monitoring Diperlukan")
+            .setMessage("Untuk mendeteksi aplikasi lain saat ujian, aktifkan izin 'Penggunaan Aplikasi'.\n\nLangkah:\n1. Klik OK\n2. Cari 'eSMK Altan'\n3. Aktifkan\n4. Kembali ke aplikasi")
+            .setCancelable(false)
+            .setPositiveButton("OK, Aktifkan") { _, _ ->
+                startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
             }
-        }, if (isAccessibilityServiceEnabled()) 0L else 1000L)
+            .setNegativeButton("Lewati") { _, _ -> }
+            .show()
     }
 
     private fun isAccessibilityServiceEnabled(): Boolean {
@@ -169,23 +187,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupFullScreen() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            window.insetsController?.let {
-                it.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
-                it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                window.insetsController?.let {
+                    it.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
+                    it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                window.decorView.systemUiVisibility = (
+                    View.SYSTEM_UI_FLAG_FULLSCREEN or
+                    View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                )
             }
-        } else {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = (
-                View.SYSTEM_UI_FLAG_FULLSCREEN or
-                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-            )
-        }
-    }
-
-    private fun startKioskMode() {
-        try { startLockTask() } catch (e: Exception) { /* device mungkin tidak support kiosk */ }
+        } catch (e: Exception) { /* abaikan jika gagal */ }
     }
 
     private fun startSecurityMonitor() {
@@ -193,28 +209,11 @@ class MainActivity : AppCompatActivity() {
             override fun run() {
                 if (!isExamFinished) {
                     setupFullScreen()
-                    checkForegroundApp()
-                    handler.postDelayed(this, 1500)
+                    handler.postDelayed(this, 2000)
                 }
             }
         }
         handler.post(securityRunnable!!)
-    }
-
-    @Suppress("DEPRECATION")
-    private fun checkForegroundApp() {
-        if (isExamFinished) return
-        try {
-            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-            val tasks = am.getRunningTasks(2) ?: return
-            if (tasks.isNotEmpty()) {
-                val top = tasks[0].topActivity?.packageName ?: return
-                if (top != packageName) {
-                    triggerViolation("Aplikasi lain dibuka: ${getAppName(top)}")
-                    bringAppToFront()
-                }
-            }
-        } catch (e: Exception) { /* abaikan error permission */ }
     }
 
     private fun startOverlayDetectorService() {
@@ -239,10 +238,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun reportViolationToWeb(reason: String) {
-        triggerViolation(reason)
-    }
-
-    private fun triggerViolation(reason: String) {
         if (isExamFinished) return
         val now = System.currentTimeMillis()
         if (now - lastViolationTime < VIOLATION_COOLDOWN) return
@@ -266,12 +261,6 @@ class MainActivity : AppCompatActivity() {
                 )
             })
         } catch (e: Exception) { }
-    }
-
-    private fun getAppName(pkg: String): String {
-        return try {
-            packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
-        } catch (e: Exception) { pkg }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -303,7 +292,6 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPageFinished(v: WebView?, u: String?) {
                 loadingLayout.visibility = View.GONE
-                // Inject JS: disable context menu, copy, select
                 webView.evaluateJavascript("""
                     (function(){
                         window.isNativeApp = true;
@@ -324,19 +312,12 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            // PERBAIKAN: handle SSL error dengan benar, bukan langsung proceed
             override fun onReceivedSslError(v: WebView?, h: SslErrorHandler?, e: android.net.http.SslError?) {
-                // Izinkan hanya untuk domain ujian.smkaltan.sch.id
                 val url = v?.url ?: ""
-                if (url.contains("smkaltan.sch.id")) {
-                    h?.proceed()
-                } else {
-                    h?.cancel()
-                }
+                if (url.contains("smkaltan.sch.id")) h?.proceed() else h?.cancel()
             }
 
             override fun shouldOverrideUrlLoading(v: WebView?, r: WebResourceRequest?): Boolean {
-                // Hanya izinkan URL dari domain smkaltan
                 val url = r?.url?.toString() ?: return false
                 return !url.contains("smkaltan.sch.id")
             }
@@ -352,14 +333,11 @@ class MainActivity : AppCompatActivity() {
 
         webView.addJavascriptInterface(object : Any() {
             @JavascriptInterface
-            fun examFinished() {
-                runOnUiThread { showFinishDialog() }
-            }
+            fun examFinished() { runOnUiThread { showFinishDialog() } }
 
             @JavascriptInterface
-            fun getDeviceInfo(): String {
-                return """{"platform":"android","version":"${Build.VERSION.RELEASE}","isApp":true}"""
-            }
+            fun getDeviceInfo(): String =
+                """{"platform":"android","version":"${Build.VERSION.RELEASE}","isApp":true}"""
         }, "AndroidBridge")
 
         if (isNetworkAvailable()) {
@@ -399,10 +377,7 @@ class MainActivity : AppCompatActivity() {
                 .setTitle("Ujian Selesai")
                 .setMessage("Ujian telah selesai. Terima kasih!")
                 .setCancelable(false)
-                .setPositiveButton("Keluar") { _, _ ->
-                    try { stopLockTask() } catch (e: Exception) { }
-                    finish()
-                }
+                .setPositiveButton("Keluar") { _, _ -> finish() }
                 .show()
         }
     }
