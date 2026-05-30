@@ -16,7 +16,6 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    // ── Signing: baca dari environment variable (GitHub Secrets) ──
     signingConfigs {
         getByName("debug") {
             enableV1Signing = true
@@ -28,7 +27,6 @@ android {
             val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
             val keyAlias = System.getenv("KEY_ALIAS")
             val keyPassword = System.getenv("KEY_PASSWORD")
-
             if (keystorePath != null) {
                 storeFile = file(keystorePath)
                 storePassword = keystorePassword
