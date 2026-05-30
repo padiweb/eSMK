@@ -5,11 +5,14 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Wajib Android 14+ untuk foreground service -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.GET_TASKS" />
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions"/>
     <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE"
         tools:ignore="ProtectedPermissions"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="false"
@@ -19,14 +22,14 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.UjianSMKAltan"
         android:hardwareAccelerated="true"
-        tools:targetApi="35">
+        tools:targetApi="36">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleInstance"
             android:screenOrientation="portrait"
-            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -34,7 +37,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Accessibility Service: deteksi floating window -->
+        <!-- Accessibility Service -->
         <service
             android:name=".ExamAccessibilityService"
             android:exported="true"
@@ -48,10 +51,15 @@
                 android:resource="@xml/accessibility_service_config" />
         </service>
 
-        <!-- Overlay Detector Service: kompatibel Android 9+ -->
+        <!-- Overlay Detector Service: wajib ada foregroundServiceType untuk Android 14+ -->
         <service
             android:name=".OverlayDetectorService"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Memantau keamanan ujian agar siswa tidak membuka aplikasi lain" />
+        </service>
 
     </application>
 
