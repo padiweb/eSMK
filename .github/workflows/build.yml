@@ -1,9 +1,7 @@
-name: Build APK
+name: Build Release AAB (Play Store)
 
 on:
   push:
-    branches: [ main, develop ]
-  pull_request:
     branches: [ main ]
   workflow_dispatch:
 
@@ -50,19 +48,46 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
+      # ── Decode keystore dari GitHub Secret ──
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > $RUNNER_TEMP/esmk-release.jks
+
+      # ── Build AAB Release (format wajib Play Store) ──
+      - name: Build Release AAB
+        run: ./gradlew bundleRelease --stacktrace
+        env:
+          KEYSTORE_PATH: ${{ runner.temp }}/esmk-release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      # ── Sign AAB dengan keystore release ──
+      - name: Sign AAB
+        run: |
+          $ANDROID_HOME/build-tools/35.0.0/apksigner sign \
+            --ks $RUNNER_TEMP/esmk-release.jks \
+            --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} \
+            --ks-key-alias ${{ secrets.KEY_ALIAS }} \
+            --key-pass pass:${{ secrets.KEY_PASSWORD }} \
+            --out app/build/outputs/bundle/release/app-release-signed.aab \
+            app/build/outputs/bundle/release/app-release.aab
+
+      # ── Upload AAB siap Play Store ──
+      - name: Upload Release AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: eSMK-release-aab-${{ github.run_number }}
+          path: app/build/outputs/bundle/release/app-release-signed.aab
+          retention-days: 30
+
+      # ── Bonus: build APK debug juga untuk testing ──
       - name: Build Debug APK
         run: ./gradlew assembleDebug --stacktrace
-
-      # Verifikasi signature APK
-      - name: Verifikasi APK Signature
-        run: |
-          $ANDROID_HOME/build-tools/35.0.0/apksigner verify \
-            --print-certs \
-            app/build/outputs/apk/debug/app-debug.apk || true
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: ujian-smkaltan-debug-${{ github.run_number }}
+          name: eSMK-debug-apk-${{ github.run_number }}
           path: app/build/outputs/apk/debug/*.apk
-          retention-days: 30
+          retention-days: 14
