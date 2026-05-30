@@ -1,6 +1,7 @@
 package com.smkaltan.ujian
 
 import android.annotation.SuppressLint
+import android.app.role.RoleManager
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
@@ -22,6 +23,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 
@@ -42,7 +44,14 @@ class MainActivity : AppCompatActivity() {
         var instance: MainActivity? = null
     }
 
-    @SuppressLint("SetJavaScriptEnabled")
+    // Launcher untuk request jadi Home app (Android 10+)
+    private val requestHomeLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        // Setelah user pilih, lanjut setup ujian
+        setupExam()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         instance = this
@@ -65,9 +74,47 @@ class MainActivity : AppCompatActivity() {
         setupFullScreen()
         setupWebView()
 
-        if (!isAccessibilityServiceEnabled()) showAccessibilityPermissionDialog()
-        else ExamAccessibilityService.isExamActive = true
+        // Langkah 1: minta jadi default Home dulu, baru setup ujian
+        requestToBeDefaultHome()
+    }
 
+    // ── Minta jadi default Home launcher ──
+    private fun requestToBeDefaultHome() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Android 10+ pakai RoleManager
+            val roleManager = getSystemService(RoleManager::class.java)
+            if (!roleManager.isRoleHeld(RoleManager.ROLE_HOME)) {
+                val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_HOME)
+                requestHomeLauncher.launch(intent)
+                return
+            }
+        } else {
+            // Android 8-9: tampilkan dialog pilih launcher
+            val intent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_HOME)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            // Kalau belum jadi default, Android akan tanya sendiri
+            val resolveInfo = packageManager.resolveActivity(intent, 0)
+            if (resolveInfo?.activityInfo?.packageName != packageName) {
+                // Paksa muncul chooser
+                val chooser = Intent.createChooser(intent, "Pilih eSMK Altan sebagai aplikasi Beranda")
+                try { startActivity(chooser) } catch (e: Exception) { }
+            }
+        }
+        setupExam()
+    }
+
+    // ── Setup ujian setelah Home ditetapkan ──
+    private fun setupExam() {
+        // Cek accessibility
+        if (!isAccessibilityServiceEnabled()) {
+            showAccessibilityPermissionDialog()
+        } else {
+            ExamAccessibilityService.isExamActive = true
+        }
+
+        // Cek usage stats
         handler.postDelayed({
             if (!isFinishing && !isDestroyed && !isUsageStatsPermissionGranted()) {
                 showUsageStatsPermissionDialog()
@@ -83,7 +130,9 @@ class MainActivity : AppCompatActivity() {
 
         webView = WebView(this).apply {
             layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
         }
         root.addView(webView)
 
@@ -92,7 +141,9 @@ class MainActivity : AppCompatActivity() {
             gravity = android.view.Gravity.CENTER
             setBackgroundColor(0xFF1a237e.toInt())
             layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
         }
         loadingLayout.addView(TextView(this).apply {
             text = "📖"; textSize = 56f; gravity = android.view.Gravity.CENTER; setPadding(0, 0, 0, 16)
@@ -195,7 +246,7 @@ class MainActivity : AppCompatActivity() {
     private fun showUsageStatsPermissionDialog() {
         AlertDialog.Builder(this)
             .setTitle("⚠️ Izin Monitoring Diperlukan")
-            .setMessage("Untuk mendeteksi aplikasi lain saat ujian, aktifkan izin 'Penggunaan Aplikasi'.\n\nLangkah:\n1. Klik OK\n2. Cari 'eSMK Altan'\n3. Aktifkan\n4. Kembali ke aplikasi")
+            .setMessage("Aktifkan izin 'Penggunaan Aplikasi' untuk keamanan ujian.\n\n1. Klik OK\n2. Cari 'eSMK Altan'\n3. Aktifkan\n4. Kembali ke aplikasi")
             .setCancelable(false)
             .setPositiveButton("OK, Aktifkan") { _, _ -> startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
             .setNegativeButton("Lewati") { _, _ -> }
@@ -204,7 +255,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun isAccessibilityServiceEnabled(): Boolean {
         val service = "${packageName}/${ExamAccessibilityService::class.java.canonicalName}"
-        val enabled = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: return false
+        val enabled = Settings.Secure.getString(
+            contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ) ?: return false
         val sp = TextUtils.SimpleStringSplitter(':')
         sp.setString(enabled)
         while (sp.hasNext()) { if (sp.next().equals(service, ignoreCase = true)) return true }
@@ -215,7 +268,7 @@ class MainActivity : AppCompatActivity() {
         if (!isFinishing && !isDestroyed) {
             AlertDialog.Builder(this)
                 .setTitle("⚠️ Izin Keamanan Diperlukan")
-                .setMessage("Untuk memblokir floating window saat ujian, aktifkan izin Accessibility.\n\nLangkah:\n1. Klik OK\n2. Cari 'eSMK Altan'\n3. Aktifkan\n4. Kembali ke aplikasi")
+                .setMessage("Aktifkan Accessibility Service untuk keamanan ujian.\n\n1. Klik OK\n2. Cari 'eSMK Altan'\n3. Aktifkan\n4. Kembali ke aplikasi")
                 .setCancelable(false)
                 .setPositiveButton("OK, Aktifkan") { _, _ -> startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
                 .setNegativeButton("Lewati") { _, _ -> }
@@ -252,10 +305,10 @@ class MainActivity : AppCompatActivity() {
                 webView.evaluateJavascript("""
                     (function(){
                         window.isNativeApp = true;
-                        document.addEventListener('contextmenu', function(e){ e.preventDefault(); });
-                        document.addEventListener('selectstart', function(e){ e.preventDefault(); });
-                        document.addEventListener('copy', function(e){ e.preventDefault(); });
-                        document.addEventListener('cut', function(e){ e.preventDefault(); });
+                        document.addEventListener('contextmenu',function(e){e.preventDefault();});
+                        document.addEventListener('selectstart',function(e){e.preventDefault();});
+                        document.addEventListener('copy',function(e){e.preventDefault();});
+                        document.addEventListener('cut',function(e){e.preventDefault();});
                     })();
                 """.trimIndent(), null)
                 ExamAccessibilityService.isExamActive = true
@@ -294,7 +347,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun isNetworkAvailable(): Boolean {
         val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        return cm.getNetworkCapabilities(cm.activeNetwork)?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+        return cm.getNetworkCapabilities(cm.activeNetwork)
+            ?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
     }
 
     private fun showNoNetworkDialog() {
@@ -314,10 +368,18 @@ class MainActivity : AppCompatActivity() {
         isExamFinished = true
         ExamAccessibilityService.isExamActive = false
         stopOverlayDetectorService()
+
+        // Kembalikan launcher asli setelah ujian selesai
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
+            } catch (e: Exception) { }
+        }
+
         if (!isFinishing && !isDestroyed) {
             AlertDialog.Builder(this)
-                .setTitle("Ujian Selesai")
-                .setMessage("Ujian telah selesai. Terima kasih!")
+                .setTitle("Ujian Selesai ✅")
+                .setMessage("Ujian telah selesai.\n\nSilakan kembalikan pengaturan Beranda HP ke launcher semula di Pengaturan yang muncul.")
                 .setCancelable(false)
                 .setPositiveButton("Keluar") { _, _ -> finish() }
                 .show()
@@ -326,7 +388,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateStatus(msg: String) { runOnUiThread { statusText.text = msg } }
 
-    // ── Blokir semua tombol fisik saat ujian ──
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (isExamFinished) return super.onKeyDown(keyCode, event)
         return when (keyCode) {
@@ -352,7 +413,7 @@ class MainActivity : AppCompatActivity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (!isExamFinished && webView.canGoBack()) webView.goBack()
-        // tidak panggil super → back tidak bisa keluar app
+        // tidak panggil super → tidak bisa keluar
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
