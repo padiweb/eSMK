@@ -16,13 +16,28 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    // ── Paksa v1 + v2 + v3 signature untuk semua build ──
+    // ── Signing: baca dari environment variable (GitHub Secrets) ──
     signingConfigs {
         getByName("debug") {
             enableV1Signing = true
             enableV2Signing = true
             enableV3Signing = true
-            enableV4Signing = true
+        }
+        create("release") {
+            val keystorePath = System.getenv("KEYSTORE_PATH")
+            val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
+            val keyAlias = System.getenv("KEY_ALIAS")
+            val keyPassword = System.getenv("KEY_PASSWORD")
+
+            if (keystorePath != null) {
+                storeFile = file(keystorePath)
+                storePassword = keystorePassword
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+            }
         }
     }
 
@@ -38,7 +53,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
@@ -55,7 +70,6 @@ android {
         buildConfig = true
     }
 
-    // Pastikan APK support semua arsitektur CPU
     splits {
         abi {
             isEnable = false
